@@ -1,0 +1,48 @@
+{
+  "name": "sistema-op-producao",
+  "version": "1.0.0",
+  "description": "Sistema de Ordem de Produção - Ffilotex & CC Fios",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.263.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.2",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "vite": "^5.3.1"
+  },
+  "keywords": [
+    "ordem-producao",
+    "gestao-producao",
+    "controle-estoque",
+    "separacao",
+    "ffilotex",
+    "cc-fios"
+  ],
+  "author": "Sua Empresa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seu-usuario/sistema-op.git"
+  },
+  "bugs": {
+    "url": "https://github.com/seu-usuario/sistema-op/issues"
+  },
+  "homepage": "https://github.com/seu-usuario/sistema-op#readme"
+}
