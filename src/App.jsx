@@ -83,7 +83,7 @@ export default function App() {
 
   const opsFiltradas = ops.filter(op => {
     if (filtroGrupo !== 'todos' && op.grupo !== filtroGrupo) return false;
-    if (filtroProduto && !op.sku_produtoAcabado.toLowerCase().includes(filtroProduto.toLowerCase())) return false;
+    if (filtroProduto && !op.sku_materiaPrima.toLowerCase().includes(filtroProduto.toLowerCase())) return false;
     if (filtroStatus !== 'todos' && op.statusSeparacao !== filtroStatus) return false;
     if (usuario === 'gestor' && op.statusSeparacao === 'Pendente') return false;
     return true;
@@ -198,7 +198,7 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Produto Acabado</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fio Intermediário</label>
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
                 <input
@@ -245,7 +245,7 @@ export default function App() {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grupo</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matéria-Prima</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fio Intermediário</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto Acabado</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>

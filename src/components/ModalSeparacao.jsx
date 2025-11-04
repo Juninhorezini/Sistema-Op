@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function ModalSeparacao({ op, onClose, onSalvar }) {
   const [tipoSeparacao, setTipoSeparacao] = useState('Total');
@@ -6,6 +6,15 @@ export default function ModalSeparacao({ op, onClose, onSalvar }) {
   const [observacao, setObservacao] = useState('');
 
   const qtdKg = (qtdRocas * (op.quantidade_kg / op.quantidade_rocas)).toFixed(2);
+
+  // Atualizar quantidade quando mudar o tipo de separação
+  useEffect(() => {
+    if (tipoSeparacao === 'Total') {
+      setQtdRocas(op.quantidade_rocas);
+    } else if (tipoSeparacao === 'Parcial') {
+      setQtdRocas(0);
+    }
+  }, [tipoSeparacao, op.quantidade_rocas]);
 
   const handleSalvar = () => {
     onSalvar({
@@ -15,6 +24,9 @@ export default function ModalSeparacao({ op, onClose, onSalvar }) {
       observacao: observacao
     });
   };
+
+  // Validar se pode salvar (Parcial precisa ter quantidade > 0)
+  const podeSalvar = tipoSeparacao !== 'Parcial' || (tipoSeparacao === 'Parcial' && qtdRocas > 0);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -88,21 +100,31 @@ export default function ModalSeparacao({ op, onClose, onSalvar }) {
           {(tipoSeparacao === 'Total' || tipoSeparacao === 'Parcial') && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Quantidade Separada (em rocas)
+                Quantidade Separada (em rocas) {tipoSeparacao === 'Parcial' && <span className="text-red-600">*</span>}
               </label>
               <input
                 type="number"
                 value={qtdRocas}
                 onChange={(e) => setQtdRocas(e.target.value)}
-                max={op.quantidade_rocas}
+                min="0"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
               <p className="mt-2 text-sm text-gray-600">
                 Equivalente a <span className="font-bold">{qtdKg} kg</span>
               </p>
-              {tipoSeparacao === 'Parcial' && qtdRocas < op.quantidade_rocas && (
+              {tipoSeparacao === 'Total' && qtdRocas > op.quantidade_rocas && (
+                <p className="mt-2 text-sm text-green-600 font-medium">
+                  ✅ Separando {qtdRocas - op.quantidade_rocas} rocas a mais ({(qtdKg - op.quantidade_kg).toFixed(2)} kg)
+                </p>
+              )}
+              {tipoSeparacao === 'Parcial' && qtdRocas < op.quantidade_rocas && qtdRocas > 0 && (
                 <p className="mt-2 text-sm text-orange-600 font-medium">
                   ⚠️ Faltam {op.quantidade_rocas - qtdRocas} rocas ({(op.quantidade_kg - qtdKg).toFixed(2)} kg)
+                </p>
+              )}
+              {tipoSeparacao === 'Parcial' && qtdRocas == 0 && (
+                <p className="mt-2 text-sm text-red-600 font-medium">
+                  ⚠️ Informe a quantidade que foi separada
                 </p>
               )}
             </div>
@@ -111,14 +133,14 @@ export default function ModalSeparacao({ op, onClose, onSalvar }) {
           {/* Observação */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Observações {tipoSeparacao !== 'Total' && '(obrigatório)'}
+              Observações (opcional)
             </label>
             <textarea
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
               rows={3}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Descreva o motivo da separação parcial ou falta de material..."
+              placeholder="Adicione observações se necessário..."
             />
           </div>
         </div>
@@ -132,7 +154,7 @@ export default function ModalSeparacao({ op, onClose, onSalvar }) {
           </button>
           <button
             onClick={handleSalvar}
-            disabled={tipoSeparacao !== 'Total' && !observacao}
+            disabled={!podeSalvar}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             Confirmar Separação
