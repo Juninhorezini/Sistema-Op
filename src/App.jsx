@@ -3,6 +3,7 @@ import { Package, Filter, CheckCircle, XCircle, AlertCircle, Printer, Search, Ey
 import ModalSeparacao from './components/ModalSeparacao';
 import ModalVisualizacao from './components/ModalVisualizacao';
 import StatusBadge from './components/StatusBadge';
+import { sheetsService } from './services/sheetsService';
 
 export default function App() {
   const [usuario, setUsuario] = useState('separador');
@@ -12,8 +13,35 @@ export default function App() {
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [opSelecionada, setOpSelecionada] = useState(null);
   
+  // Estados para Google Sheets
+  const [isGoogleReady, setIsGoogleReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoadingSheets, setIsLoadingSheets] = useState(false);
+  const [useGoogleSheets, setUseGoogleSheets] = useState(false);
+  
+  // Carregar dados iniciais mockados
   useEffect(() => {
     carregarDadosIniciais();
+  }, []);
+
+  // Inicializar Google Sheets API
+  useEffect(() => {
+    async function initGoogle() {
+      try {
+        console.log('🔄 Inicializando Google Sheets API...');
+        await sheetsService.initialize();
+        setIsGoogleReady(true);
+        console.log('✅ Google Sheets API pronta!');
+        
+        if (sheetsService.isUserAuthenticated()) {
+          setIsAuthenticated(true);
+          console.log('✅ Usuário já autenticado');
+        }
+      } catch (error) {
+        console.error('❌ Erro ao inicializar Google Sheets:', error);
+      }
+    }
+    initGoogle();
   }, []);
 
   function carregarDadosIniciais() {
@@ -81,6 +109,50 @@ export default function App() {
     setOps(dadosSimulados);
   }
 
+  // Login com Google
+  async function handleGoogleLogin() {
+    try {
+      setIsLoadingSheets(true);
+      console.log('🔄 Fazendo login...');
+      await sheetsService.login();
+      setIsAuthenticated(true);
+      setUseGoogleSheets(true);
+      console.log('✅ Login realizado!');
+      await carregarOPsDaPlanilha();
+    } catch (error) {
+      console.error('❌ Erro no login:', error);
+      alert('Erro ao fazer login com Google. Verifique as credenciais no console.');
+    } finally {
+      setIsLoadingSheets(false);
+    }
+  }
+
+  // Logout
+  function handleGoogleLogout() {
+    sheetsService.logout();
+    setIsAuthenticated(false);
+    setUseGoogleSheets(false);
+    console.log('✅ Logout realizado');
+    carregarDadosIniciais();
+  }
+
+  // Carregar OPs da planilha
+  async function carregarOPsDaPlanilha() {
+    try {
+      setIsLoadingSheets(true);
+      console.log('🔄 Carregando OPs da planilha...');
+      const opsFromSheet = await sheetsService.buscarOPs();
+      setOps(opsFromSheet);
+      console.log(`✅ ${opsFromSheet.length} OPs carregadas da planilha!`);
+    } catch (error) {
+      console.error('❌ Erro ao carregar OPs:', error);
+      alert('Erro ao carregar dados da planilha. Verifique o console e a estrutura da planilha.');
+      carregarDadosIniciais();
+    } finally {
+      setIsLoadingSheets(false);
+    }
+  }
+
   const opsFiltradas = ops.filter(op => {
     if (filtroGrupo !== 'todos' && op.grupo !== filtroGrupo) return false;
     if (filtroProduto && !op.sku_materiaPrima.toLowerCase().includes(filtroProduto.toLowerCase())) return false;
@@ -91,102 +163,151 @@ export default function App() {
 
   function handleImprimirOP(op) {
     alert(`Abrindo impressão da ${op.numeroOP}...\n\nEm produção, isso abrirá o layout de impressão.`);
+    
+    // Se conectado ao Sheets, marcar como impressa
+    if (useGoogleSheets && isAuthenticated) {
+      sheetsService.marcarComoImpressa(op.numeroOP)
+        .then(() => {
+          console.log('✅ OP marcada como impressa na planilha');
+          // Atualizar localmente
+          setOps(ops.map(o => 
+            o.numeroOP === op.numeroOP 
+              ? { ...o, statusImpressao: 'Impressa', dataImpressao: new Date().toLocaleString('pt-BR') }
+              : o
+          ));
+        })
+        .catch(error => {
+          console.error('❌ Erro ao marcar como impressa:', error);
+        });
+    }
   }
 
   function handleSalvarSeparacao(dados) {
+    const opAtualizada = {
+      ...opSelecionada,
+      ...dados,
+      dataSeparacao: new Date().toLocaleString('pt-BR')
+    };
+
+    // Atualizar localmente
     setOps(ops.map(o => 
-      o.numeroOP === opSelecionada.numeroOP 
-        ? { ...o, ...dados, dataSeparacao: new Date().toLocaleString('pt-BR') }
-        : o
+      o.numeroOP === opSelecionada.numeroOP ? opAtualizada : o
     ));
+
+    // Salvar na planilha se conectado
+    if (useGoogleSheets && isAuthenticated) {
+      sheetsService.atualizarSeparacao(opSelecionada.numeroOP, {
+        ...dados,
+        usuario: usuario === 'separador' ? 'Separador' : 'Gestor'
+      })
+        .then(() => {
+          console.log('✅ Separação salva na planilha!');
+          alert(`Separação da ${opSelecionada.numeroOP} salva com sucesso na planilha!`);
+        })
+        .catch(error => {
+          console.error('❌ Erro ao salvar na planilha:', error);
+          alert('Separação salva localmente, mas houve erro ao sincronizar com a planilha. Verifique o console.');
+        });
+    } else {
+      alert(`Separação da ${opSelecionada.numeroOP} atualizada! (Modo local)`);
+    }
+
     setOpSelecionada(null);
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 shadow-lg">
-        <div className="max-w-7xl mx-auto">
+      <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Sistema de Ordem de Produção</h1>
-              <p className="text-blue-100 text-sm">Ffilotex & CC Fios</p>
+            <div className="flex items-center space-x-3">
+              <Package size={32} className="text-blue-200" />
+              <div>
+                <h1 className="text-2xl font-bold">Sistema de Ordem de Produção</h1>
+                <p className="text-blue-200 text-sm">Ffilotex & CC Fios</p>
+              </div>
             </div>
-            <div className="bg-white bg-opacity-20 rounded-lg px-4 py-2">
-              <select 
-                value={usuario} 
-                onChange={(e) => setUsuario(e.target.value)}
-                className="bg-transparent text-white font-medium outline-none cursor-pointer"
-              >
-                <option value="gestor" className="text-gray-900">👤 Gestor (Usuário 1)</option>
-                <option value="separador" className="text-gray-900">📦 Separador (Usuário 2)</option>
-              </select>
+            
+            <div className="flex items-center space-x-4">
+              {/* Botão Google Sheets */}
+              {isGoogleReady && (
+                <div className="flex items-center gap-2">
+                  {!isAuthenticated ? (
+                    <button
+                      onClick={handleGoogleLogin}
+                      disabled={isLoadingSheets}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isLoadingSheets ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Conectando...
+                        </>
+                      ) : (
+                        <>
+                          📊 Conectar Google Sheets
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-sm font-medium flex items-center gap-1">
+                        <CheckCircle size={16} />
+                        Conectado ao Sheets
+                      </span>
+                      <button
+                        onClick={handleGoogleLogout}
+                        className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm transition-colors"
+                      >
+                        Desconectar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Troca de usuário */}
+              <div className="flex bg-blue-700 rounded-lg p-1">
+                <button
+                  onClick={() => setUsuario('separador')}
+                  className={`px-4 py-2 rounded-md transition-all ${
+                    usuario === 'separador' 
+                      ? 'bg-white text-blue-600 font-semibold shadow' 
+                      : 'text-blue-100 hover:text-white'
+                  }`}
+                >
+                  👤 Separador
+                </button>
+                <button
+                  onClick={() => setUsuario('gestor')}
+                  className={`px-4 py-2 rounded-md transition-all ${
+                    usuario === 'gestor' 
+                      ? 'bg-white text-blue-600 font-semibold shadow' 
+                      : 'text-blue-100 hover:text-white'
+                  }`}
+                >
+                  👔 Gestor
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Total de OPs</p>
-                <p className="text-2xl font-bold text-gray-900">{ops.length}</p>
-              </div>
-              <BarChart3 className="text-blue-600" size={32} />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Pendentes</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {ops.filter(o => o.statusSeparacao === 'Pendente').length}
-                </p>
-              </div>
-              <AlertCircle className="text-yellow-600" size={32} />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Separadas</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {ops.filter(o => o.statusSeparacao === 'Total').length}
-                </p>
-              </div>
-              <CheckCircle className="text-green-600" size={32} />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Parciais</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {ops.filter(o => o.statusSeparacao === 'Parcial').length}
-                </p>
-              </div>
-              <Package className="text-orange-600" size={32} />
-            </div>
-          </div>
-        </div>
-
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-6">
         {/* Filtros */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="flex items-center space-x-2 mb-3">
-            <Filter size={20} className="text-gray-600" />
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <Filter className="text-gray-600" size={20} />
             <h2 className="text-lg font-semibold text-gray-900">Filtros</h2>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Grupo</label>
-              <select 
+              <select
                 value={filtroGrupo}
                 onChange={(e) => setFiltroGrupo(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -198,7 +319,7 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fio Intermediário</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Matéria-Prima</label>
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
                 <input
@@ -212,126 +333,188 @@ export default function App() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select 
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status Separação</label>
+              <select
                 value={filtroStatus}
                 onChange={(e) => setFiltroStatus(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="todos">Todos os Status</option>
                 <option value="Pendente">Pendente</option>
-                <option value="Total">Separado Total</option>
-                <option value="Parcial">Separado Parcial</option>
+                <option value="Parcial">Parcial</option>
+                <option value="Total">Total</option>
                 <option value="NaoSeparou">Não Separou</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Tabela de OPs */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="p-4 border-b bg-gray-50">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {usuario === 'gestor' ? 'Ordens Prontas para Impressão' : 'Ordens de Produção'}
-            </h2>
-            <p className="text-sm text-gray-600">
-              {opsFiltradas.length} {opsFiltradas.length === 1 ? 'ordem encontrada' : 'ordens encontradas'}
-            </p>
+        {/* Estatísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-yellow-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Pendentes</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {ops.filter(op => op.statusSeparacao === 'Pendente').length}
+                </p>
+              </div>
+              <AlertCircle className="text-yellow-500" size={32} />
+            </div>
           </div>
 
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-orange-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Parciais</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {ops.filter(op => op.statusSeparacao === 'Parcial').length}
+                </p>
+              </div>
+              <AlertCircle className="text-orange-500" size={32} />
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Completas</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {ops.filter(op => op.statusSeparacao === 'Total').length}
+                </p>
+              </div>
+              <CheckCircle className="text-green-500" size={32} />
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-red-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Não Separadas</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {ops.filter(op => op.statusSeparacao === 'NaoSeparou').length}
+                </p>
+              </div>
+              <XCircle className="text-red-500" size={32} />
+            </div>
+          </div>
+        </div>
+
+        {/* Loading indicator */}
+        {isLoadingSheets && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+            <div className="w-5 h-5 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-blue-700 font-medium">Sincronizando com Google Sheets...</span>
+          </div>
+        )}
+
+        {/* Tabela de OPs */}
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grupo</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fio Intermediário</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matéria-Prima</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto Acabado</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Separado</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {opsFiltradas.map(op => (
-                  <tr key={op.numeroOP} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-gray-900">{op.numeroOP}</div>
-                      <div className="text-xs text-gray-500">{op.dataCriacao}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        op.grupo === 'Ffilotex' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-purple-100 text-purple-800'
-                      }`}>
-                        {op.grupo}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{op.sku_materiaPrima}</div>
-                      <div className="text-sm text-gray-600">{op.cor_materiaPrima}</div>
-                      <div className="text-xs text-gray-500">{op.quantidade_rocas} rocas / {op.quantidade_kg} kg</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{op.sku_produtoAcabado}</div>
-                      <div className="text-sm text-gray-600">{op.descricao_produtoAcabado}</div>
-                      <div className="text-xs text-gray-500">Qtd: {op.quantidade_produtoAcabado}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {op.statusSeparacao === 'Pendente' ? (
-                        <span className="text-gray-400">-</span>
-                      ) : (
-                        <div>
-                          <div className="text-sm font-medium">
-                            {op.qtd_separada_rocas} / {op.quantidade_rocas} rocas
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {op.qtd_separada_kg} / {op.quantidade_kg} kg
-                          </div>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={op.statusSeparacao} />
-                      {op.statusImpressao === 'Impressa' && (
-                        <div className="mt-1">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                            <Printer size={12} className="mr-1" />
-                            Impressa
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {usuario === 'separador' && op.statusSeparacao === 'Pendente' && (
-                        <button
-                          onClick={() => setOpSelecionada(op)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm font-medium"
-                        >
-                          Separar
-                        </button>
-                      )}
-                      {usuario === 'gestor' && (
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleImprimirOP(op)}
-                            className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm font-medium flex items-center space-x-1"
-                          >
-                            <Printer size={14} />
-                            <span>Imprimir</span>
-                          </button>
-                          <button
-                            onClick={() => setOpSelecionada(op)}
-                            className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
-                          >
-                            <Eye size={14} />
-                          </button>
-                        </div>
-                      )}
+              <tbody className="bg-white divide-y divide-gray-200">
+                {opsFiltradas.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                      <div className="flex flex-col items-center">
+                        <Package size={48} className="text-gray-300 mb-2" />
+                        <p className="text-lg font-medium">Nenhuma OP encontrada</p>
+                        <p className="text-sm">Ajuste os filtros ou aguarde o carregamento dos dados</p>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  opsFiltradas.map(op => (
+                    <tr key={op.numeroOP} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-gray-900">{op.numeroOP}</div>
+                        <div className="text-xs text-gray-500">{op.dataCriacao}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          op.grupo === 'Ffilotex' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : 'bg-purple-100 text-purple-800'
+                        }`}>
+                          {op.grupo}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{op.sku_materiaPrima}</div>
+                        <div className="text-sm text-gray-600">{op.cor_materiaPrima}</div>
+                        <div className="text-xs text-gray-500">{op.quantidade_rocas} rocas / {op.quantidade_kg} kg</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{op.sku_produtoAcabado}</div>
+                        <div className="text-sm text-gray-600">{op.descricao_produtoAcabado}</div>
+                        <div className="text-xs text-gray-500">Qtd: {op.quantidade_produtoAcabado}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {op.statusSeparacao === 'Pendente' ? (
+                          <span className="text-gray-400">-</span>
+                        ) : (
+                          <div>
+                            <div className="text-sm font-medium">
+                              {op.qtd_separada_rocas} / {op.quantidade_rocas} rocas
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {op.qtd_separada_kg} / {op.quantidade_kg} kg
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={op.statusSeparacao} />
+                        {op.statusImpressao === 'Impressa' && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                              <Printer size={12} className="mr-1" />
+                              Impressa
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {usuario === 'separador' && op.statusSeparacao === 'Pendente' && (
+                          <button
+                            onClick={() => setOpSelecionada(op)}
+                            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm font-medium"
+                          >
+                            Separar
+                          </button>
+                        )}
+                        {usuario === 'gestor' && (
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleImprimirOP(op)}
+                              className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm font-medium flex items-center space-x-1"
+                            >
+                              <Printer size={14} />
+                              <span>Imprimir</span>
+                            </button>
+                            <button
+                              onClick={() => setOpSelecionada(op)}
+                              className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
+                            >
+                              <Eye size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
