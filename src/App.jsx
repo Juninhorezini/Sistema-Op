@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Package, Filter, CheckCircle, XCircle, AlertCircle, Printer, Search, Eye, BarChart3 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Package, Filter, CheckCircle, XCircle, AlertCircle, Printer, Search, Eye, BarChart3, RefreshCw } from 'lucide-react';
 import ModalSeparacao from './components/ModalSeparacao';
 import ModalVisualizacao from './components/ModalVisualizacao';
 import StatusBadge from './components/StatusBadge';
@@ -18,6 +18,11 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingSheets, setIsLoadingSheets] = useState(false);
   const [useGoogleSheets, setUseGoogleSheets] = useState(false);
+  
+  // Estados para sincronização em tempo real
+  const [ultimaSincronizacao, setUltimaSincronizacao] = useState(null);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const intervalRef = useRef(null);
   
   // Carregar dados iniciais mockados
   useEffect(() => {
@@ -43,6 +48,26 @@ export default function App() {
     }
     initGoogle();
   }, []);
+
+  // Auto-sync: Sincronizar automaticamente a cada 30 segundos
+  useEffect(() => {
+    if (useGoogleSheets && isAuthenticated && autoSyncEnabled) {
+      console.log('🔄 Auto-sync ativado (30 segundos)');
+      
+      sincronizarDados();
+      
+      intervalRef.current = setInterval(() => {
+        sincronizarDados();
+      }, 30000);
+      
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          console.log('🛑 Auto-sync desativado');
+        }
+      };
+    }
+  }, [useGoogleSheets, isAuthenticated, autoSyncEnabled]);
 
   function carregarDadosIniciais() {
     const dadosSimulados = [
@@ -109,48 +134,70 @@ export default function App() {
     setOps(dadosSimulados);
   }
 
-  // Login com Google
   async function handleGoogleLogin() {
     try {
       setIsLoadingSheets(true);
-      console.log('🔄 Fazendo login...');
       await sheetsService.login();
       setIsAuthenticated(true);
       setUseGoogleSheets(true);
-      console.log('✅ Login realizado!');
       await carregarOPsDaPlanilha();
     } catch (error) {
       console.error('❌ Erro no login:', error);
-      alert('Erro ao fazer login com Google. Verifique as credenciais no console.');
+      alert('Erro ao fazer login. Verifique o console.');
     } finally {
       setIsLoadingSheets(false);
     }
   }
 
-  // Logout
   function handleGoogleLogout() {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
     sheetsService.logout();
     setIsAuthenticated(false);
     setUseGoogleSheets(false);
-    console.log('✅ Logout realizado');
+    setUltimaSincronizacao(null);
     carregarDadosIniciais();
   }
 
-  // Carregar OPs da planilha
   async function carregarOPsDaPlanilha() {
     try {
       setIsLoadingSheets(true);
-      console.log('🔄 Carregando OPs da planilha...');
       const opsFromSheet = await sheetsService.buscarOPs();
       setOps(opsFromSheet);
-      console.log(`✅ ${opsFromSheet.length} OPs carregadas da planilha!`);
+      setUltimaSincronizacao(new Date());
+      console.log(`✅ ${opsFromSheet.length} OPs carregadas!`);
     } catch (error) {
       console.error('❌ Erro ao carregar OPs:', error);
-      alert('Erro ao carregar dados da planilha. Verifique o console e a estrutura da planilha.');
+      alert('Erro ao carregar dados da planilha.');
       carregarDadosIniciais();
     } finally {
       setIsLoadingSheets(false);
     }
+  }
+
+  async function sincronizarDados() {
+    if (!useGoogleSheets || !isAuthenticated) return;
+    try {
+      const opsFromSheet = await sheetsService.buscarOPs();
+      setOps(opsFromSheet);
+      setUltimaSincronizacao(new Date());
+      console.log(`✅ Sincronizado: ${opsFromSheet.length} OPs`);
+    } catch (error) {
+      console.error('❌ Erro na sincronização:', error);
+    }
+  }
+
+  async function handleAtualizarManual() {
+    await carregarOPsDaPlanilha();
+  }
+
+  function formatarTempoSincronizacao() {
+    if (!ultimaSincronizacao) return '';
+    const diff = Math.floor((new Date() - ultimaSincronizacao) / 1000);
+    if (diff < 60) return `há ${diff}s`;
+    if (diff < 3600) return `há ${Math.floor(diff / 60)}min`;
+    return `há ${Math.floor(diff / 3600)}h`;
   }
 
   const opsFiltradas = ops.filter(op => {
@@ -162,23 +209,11 @@ export default function App() {
   });
 
   function handleImprimirOP(op) {
-    alert(`Abrindo impressão da ${op.numeroOP}...\n\nEm produção, isso abrirá o layout de impressão.`);
-    
-    // Se conectado ao Sheets, marcar como impressa
+    alert(`Abrindo impressão da ${op.numeroOP}...`);
     if (useGoogleSheets && isAuthenticated) {
       sheetsService.marcarComoImpressa(op.numeroOP)
-        .then(() => {
-          console.log('✅ OP marcada como impressa na planilha');
-          // Atualizar localmente
-          setOps(ops.map(o => 
-            o.numeroOP === op.numeroOP 
-              ? { ...o, statusImpressao: 'Impressa', dataImpressao: new Date().toLocaleString('pt-BR') }
-              : o
-          ));
-        })
-        .catch(error => {
-          console.error('❌ Erro ao marcar como impressa:', error);
-        });
+        .then(() => sincronizarDados())
+        .catch(error => console.error(error));
     }
   }
 
@@ -189,35 +224,31 @@ export default function App() {
       dataSeparacao: new Date().toLocaleString('pt-BR')
     };
 
-    // Atualizar localmente
     setOps(ops.map(o => 
       o.numeroOP === opSelecionada.numeroOP ? opAtualizada : o
     ));
 
-    // Salvar na planilha se conectado
     if (useGoogleSheets && isAuthenticated) {
       sheetsService.atualizarSeparacao(opSelecionada.numeroOP, {
         ...dados,
         usuario: usuario === 'separador' ? 'Separador' : 'Gestor'
       })
         .then(() => {
-          console.log('✅ Separação salva na planilha!');
-          alert(`Separação da ${opSelecionada.numeroOP} salva com sucesso na planilha!`);
+          alert(`Separação salva com sucesso!`);
+          sincronizarDados();
         })
         .catch(error => {
-          console.error('❌ Erro ao salvar na planilha:', error);
-          alert('Separação salva localmente, mas houve erro ao sincronizar com a planilha. Verifique o console.');
+          console.error(error);
+          alert('Erro ao salvar na planilha.');
         });
     } else {
-      alert(`Separação da ${opSelecionada.numeroOP} atualizada! (Modo local)`);
+      alert(`Separação atualizada! (Modo local)`);
     }
 
     setOpSelecionada(null);
   }
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -230,7 +261,6 @@ export default function App() {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* Botão Google Sheets */}
               {isGoogleReady && (
                 <div className="flex items-center gap-2">
                   {!isAuthenticated ? (
@@ -245,17 +275,43 @@ export default function App() {
                           Conectando...
                         </>
                       ) : (
-                        <>
-                          📊 Conectar Google Sheets
-                        </>
+                        <>📊 Conectar Google Sheets</>
                       )}
                     </button>
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-sm font-medium flex items-center gap-1">
                         <CheckCircle size={16} />
-                        Conectado ao Sheets
+                        Conectado
+                        {ultimaSincronizacao && (
+                          <span className="text-xs text-green-600 ml-1">
+                            {formatarTempoSincronizacao()}
+                          </span>
+                        )}
                       </span>
+                      
+                      <button
+                        onClick={handleAtualizarManual}
+                        disabled={isLoadingSheets}
+                        className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm transition-colors flex items-center gap-1 disabled:bg-gray-400"
+                        title="Atualizar dados da planilha"
+                      >
+                        <RefreshCw size={16} className={isLoadingSheets ? 'animate-spin' : ''} />
+                        Atualizar
+                      </button>
+                      
+                      <button
+                        onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                        className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                          autoSyncEnabled 
+                            ? 'bg-green-500 hover:bg-green-600 text-white' 
+                            : 'bg-gray-400 hover:bg-gray-500 text-white'
+                        }`}
+                        title={autoSyncEnabled ? 'Auto-sync ativado' : 'Auto-sync desativado'}
+                      >
+                        {autoSyncEnabled ? '🔄 Auto' : '⏸️ Manual'}
+                      </button>
+                      
                       <button
                         onClick={handleGoogleLogout}
                         className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm transition-colors"
@@ -267,7 +323,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Troca de usuário */}
               <div className="flex bg-blue-700 rounded-lg p-1">
                 <button
                   onClick={() => setUsuario('separador')}
@@ -295,9 +350,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="container mx-auto px-4 py-6">
-        {/* Filtros */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center space-x-2 mb-4">
             <Filter className="text-gray-600" size={20} />
@@ -349,7 +402,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Estatísticas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-yellow-500">
             <div className="flex items-center justify-between">
@@ -400,7 +452,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Loading indicator */}
         {isLoadingSheets && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center gap-3">
             <div className="w-5 h-5 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -408,7 +459,15 @@ export default function App() {
           </div>
         )}
 
-        {/* Tabela de OPs */}
+        {useGoogleSheets && isAuthenticated && autoSyncEnabled && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-green-700">
+              Sincronização automática ativa • Atualiza a cada 30 segundos
+            </span>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -521,7 +580,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Modals */}
       {opSelecionada && usuario === 'separador' && opSelecionada.statusSeparacao === 'Pendente' && (
         <ModalSeparacao 
           op={opSelecionada} 
