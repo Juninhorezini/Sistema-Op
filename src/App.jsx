@@ -350,123 +350,127 @@ export default function App() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center space-x-2 mb-4">
-            <Filter className="text-gray-600" size={20} />
-            <h2 className="text-lg font-semibold text-gray-900">Filtros</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Grupo</label>
-              <select
-                value={filtroGrupo}
-                onChange={(e) => setFiltroGrupo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="todos">Todos os Grupos</option>
-                <option value="Ffilotex">Ffilotex</option>
-                <option value="CC Fios">CC Fios</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Matéria-Prima</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  value={filtroProduto}
-                  onChange={(e) => setFiltroProduto(e.target.value)}
-                  placeholder="Digite o SKU..."
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status Separação</label>
-              <select
-                value={filtroStatus}
-                onChange={(e) => setFiltroStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="todos">Todos os Status</option>
-                <option value="Pendente">Pendente</option>
-                <option value="Parcial">Parcial</option>
-                <option value="Total">Total</option>
-                <option value="NaoSeparou">Não Separou</option>
-              </select>
-            </div>
-          </div>
+<div className="container mx-auto px-4 py-6">
+  {/* Estatísticas - MOVIDO PARA CIMA */}
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-yellow-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600">Pendentes</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {ops.filter(op => op.statusSeparacao === 'Pendente').length}
+          </p>
         </div>
+        <AlertCircle className="text-yellow-500" size={32} />
+      </div>
+    </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-yellow-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Pendentes</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {ops.filter(op => op.statusSeparacao === 'Pendente').length}
-                </p>
-              </div>
-              <AlertCircle className="text-yellow-500" size={32} />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-orange-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Parciais</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {ops.filter(op => op.statusSeparacao === 'Parcial').length}
-                </p>
-              </div>
-              <AlertCircle className="text-orange-500" size={32} />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Completas</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {ops.filter(op => op.statusSeparacao === 'Total').length}
-                </p>
-              </div>
-              <CheckCircle className="text-green-500" size={32} />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-red-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Não Separadas</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {ops.filter(op => op.statusSeparacao === 'NaoSeparou').length}
-                </p>
-              </div>
-              <XCircle className="text-red-500" size={32} />
-            </div>
-          </div>
+    <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-orange-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600">Parciais</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {ops.filter(op => op.statusSeparacao === 'Parcial').length}
+          </p>
         </div>
+        <AlertCircle className="text-orange-500" size={32} />
+      </div>
+    </div>
 
-        {isLoadingSheets && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center gap-3">
-            <div className="w-5 h-5 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-blue-700 font-medium">Sincronizando com Google Sheets...</span>
-          </div>
-        )}
+    <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600">Completas</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {ops.filter(op => op.statusSeparacao === 'Total').length}
+          </p>
+        </div>
+        <CheckCircle className="text-green-500" size={32} />
+      </div>
+    </div>
 
-        {useGoogleSheets && isAuthenticated && autoSyncEnabled && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 flex items-center gap-2 text-sm">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-green-700">
-              Sincronização automática ativa • Atualiza a cada 30 segundos
-            </span>
-          </div>
-        )}
+    <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-red-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600">Não Separadas</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {ops.filter(op => op.statusSeparacao === 'NaoSeparou').length}
+          </p>
+        </div>
+        <XCircle className="text-red-500" size={32} />
+      </div>
+    </div>
+  </div>
+
+  {/* Filtros - MOVIDO PARA BAIXO */}
+  <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+    <div className="flex items-center space-x-2 mb-4">
+      <Filter className="text-gray-600" size={20} />
+      <h2 className="text-lg font-semibold text-gray-900">Filtros</h2>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Grupo</label>
+        <select
+          value={filtroGrupo}
+          onChange={(e) => setFiltroGrupo(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="todos">Todos os Grupos</option>
+          <option value="Ffilotex">Ffilotex</option>
+          <option value="CC Fios">CC Fios</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Matéria-Prima</label>
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+          <input
+            type="text"
+            value={filtroProduto}
+            onChange={(e) => setFiltroProduto(e.target.value)}
+            placeholder="Digite o SKU..."
+            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Status Separação</label>
+        <select
+          value={filtroStatus}
+          onChange={(e) => setFiltroStatus(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="todos">Todos os Status</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Parcial">Parcial</option>
+          <option value="Total">Total</option>
+          <option value="NaoSeparou">Não Separou</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {/* Loading indicator */}
+  {isLoadingSheets && (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+      <div className="w-5 h-5 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-blue-700 font-medium">Sincronizando com Google Sheets...</span>
+    </div>
+  )}
+
+  {/* Indicador de auto-sync */}
+  {useGoogleSheets && isAuthenticated && autoSyncEnabled && (
+    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 flex items-center gap-2 text-sm">
+      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+      <span className="text-green-700">
+        Sincronização automática ativa • Atualiza a cada 30 segundos
+      </span>
+    </div>
+  )}
 
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="overflow-x-auto">
