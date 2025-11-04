@@ -58,3 +58,6 @@ backup/
 # Hot Module Replacement
 *.hot-update.json
 *.hot-update.js
+# Google Credentials
+config/google-credentials.json
+config/*.json
