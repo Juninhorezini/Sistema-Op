@@ -350,7 +350,7 @@ export default function App() {
         </div>
       </header>
 
-<div className="container mx-auto px-4 py-6">
+<div className="container mx-auto px-4 py-3">
   {/* Estatísticas - MOVIDO PARA CIMA */}
   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
     <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-yellow-500">
@@ -403,8 +403,8 @@ export default function App() {
   </div>
 
   {/* Filtros - MOVIDO PARA BAIXO */}
-  <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-    <div className="flex items-center space-x-2 mb-4">
+  <div className="bg-white rounded-lg shadow-md p-3 mb-3">
+    <div className="flex items-center space-x-2 mb-3">
       <Filter className="text-gray-600" size={20} />
       <h2 className="text-lg font-semibold text-gray-900">Filtros</h2>
     </div>
@@ -464,7 +464,7 @@ export default function App() {
 
   {/* Indicador de auto-sync */}
   {useGoogleSheets && isAuthenticated && autoSyncEnabled && (
-    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 flex items-center gap-2 text-sm">
+    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 flex items-center gap-2 text-sm">
       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
       <span className="text-green-700">
         Sincronização automática ativa • Atualiza a cada 30 segundos
