@@ -87,8 +87,14 @@ class SheetsService {
           reject(response);
           return;
         }
+        
         this.accessToken = response.access_token;
         this.isAuthenticated = true;
+        
+        // Salvar token no localStorage
+        localStorage.setItem('google_access_token', response.access_token);
+        localStorage.setItem('google_token_expiry', Date.now() + (response.expires_in * 1000));
+        
         console.log('✅ Login realizado com sucesso');
         resolve(response);
       };
@@ -110,15 +116,66 @@ class SheetsService {
       window.google.accounts.oauth2.revoke(this.accessToken);
       this.accessToken = null;
       this.isAuthenticated = false;
+      
+      // Limpar token do localStorage
+      localStorage.removeItem('google_access_token');
+      localStorage.removeItem('google_token_expiry');
+      
       console.log('✅ Logout realizado');
     }
+  }
+
+  /**
+   * Tenta restaurar sessão salva
+   */
+  async restoreSession() {
+    const savedToken = localStorage.getItem('google_access_token');
+    const expiry = localStorage.getItem('google_token_expiry');
+    
+    if (!savedToken || !expiry) {
+      console.log('ℹ️ Nenhuma sessão salva encontrada');
+      return false;
+    }
+    
+    // Verificar se o token expirou
+    if (Date.now() > parseInt(expiry)) {
+      console.log('⚠️ Token expirado, limpando...');
+      localStorage.removeItem('google_access_token');
+      localStorage.removeItem('google_token_expiry');
+      return false;
+    }
+    
+    // Restaurar token
+    this.accessToken = savedToken;
+    this.isAuthenticated = true;
+    
+    // Configurar o token no gapi
+    window.gapi.client.setToken({ access_token: savedToken });
+    
+    console.log('✅ Sessão restaurada com sucesso!');
+    return true;
   }
 
   /**
    * Verifica se o usuário está autenticado
    */
   isUserAuthenticated() {
-    return this.isAuthenticated && this.accessToken !== null;
+    // Verificar se tem token em memória
+    if (this.isAuthenticated && this.accessToken !== null) {
+      return true;
+    }
+    
+    // Verificar se tem token salvo no localStorage
+    const savedToken = localStorage.getItem('google_access_token');
+    const expiry = localStorage.getItem('google_token_expiry');
+    
+    if (savedToken && expiry && Date.now() < parseInt(expiry)) {
+      this.accessToken = savedToken;
+      this.isAuthenticated = true;
+      return true;
+    }
+    
+    return false;
   }
 
   /**
