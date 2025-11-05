@@ -472,6 +472,7 @@ export default function App() {
     </div>
   )}
 
+{/* Tabela de OPs */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -480,8 +481,8 @@ export default function App() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grupo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matéria-Prima</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto Acabado</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Separado</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto Acabado</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
@@ -519,11 +520,6 @@ export default function App() {
                         <div className="text-xs text-gray-500">{op.quantidade_rocas} rocas / {op.quantidade_kg} kg</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{op.sku_produtoAcabado}</div>
-                        <div className="text-sm text-gray-600">{op.descricao_produtoAcabado}</div>
-                        <div className="text-xs text-gray-500">Qtd: {op.quantidade_produtoAcabado}</div>
-                      </td>
-                      <td className="px-4 py-3">
                         {op.statusSeparacao === 'Pendente' ? (
                           <span className="text-gray-400">-</span>
                         ) : (
@@ -536,6 +532,11 @@ export default function App() {
                             </div>
                           </div>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{op.sku_produtoAcabado}</div>
+                        <div className="text-sm text-gray-600">{op.descricao_produtoAcabado}</div>
+                        <div className="text-xs text-gray-500">Qtd: {op.quantidade_produtoAcabado}</div>
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={op.statusSeparacao} />
