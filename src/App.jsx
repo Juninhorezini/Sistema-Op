@@ -560,14 +560,22 @@ export default function App() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {usuario === 'separador' && op.statusSeparacao === 'Pendente' && (
-                          <button
-                            onClick={() => setOpSelecionada(op)}
-                            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm font-medium"
-                          >
-                            Separar
-                          </button>
-                        )}
+                        {usuario === 'separador' && (op.statusSeparacao === 'Pendente' || op.statusSeparacao === 'Parcial' || op.statusSeparacao === 'NaoSeparou') && (
+                       <button
+                       onClick={() => setOpSelecionada(op)}
+                       className={`text-white px-3 py-1 rounded text-sm font-medium ${
+                       op.statusSeparacao === 'Pendente' 
+                       ? 'bg-blue-600 hover:bg-blue-700'
+                       : op.statusSeparacao === 'Parcial'
+                       ? 'bg-orange-600 hover:bg-orange-700'
+                       : 'bg-red-600 hover:bg-red-700'
+                        }`}
+                       >
+                        {op.statusSeparacao === 'Pendente' ? 'Separar' : 
+                        op.statusSeparacao === 'Parcial' ? 'Completar' : 
+                       'Tentar Separar'}
+                       </button>
+                       )}
                         {usuario === 'gestor' && (
                           <div className="flex space-x-2">
                             <button
@@ -595,20 +603,26 @@ export default function App() {
         </div>
       </div>
 
-      {opSelecionada && usuario === 'separador' && opSelecionada.statusSeparacao === 'Pendente' && (
-        <ModalSeparacao 
-          op={opSelecionada} 
-          onClose={() => setOpSelecionada(null)}
-          onSalvar={handleSalvarSeparacao}
-        />
-      )}
+      {opSelecionada && usuario === 'separador' && 
+      (opSelecionada.statusSeparacao === 'Pendente' || 
+      opSelecionada.statusSeparacao === 'Parcial' || 
+      opSelecionada.statusSeparacao === 'NaoSeparou') && (
+      <ModalSeparacao 
+      op={opSelecionada} 
+      onClose={() => setOpSelecionada(null)}
+      onSalvar={handleSalvarSeparacao}
+      />
+     )}
 
-      {opSelecionada && (usuario === 'gestor' || opSelecionada.statusSeparacao !== 'Pendente') && (
-        <ModalVisualizacao 
-          op={opSelecionada}
-          onClose={() => setOpSelecionada(null)}
-        />
-      )}
+      {opSelecionada && (
+      usuario === 'gestor' || 
+      (usuario === 'separador' && opSelecionada.statusSeparacao === 'Total')
+     ) && (
+     <ModalVisualizacao 
+     op={opSelecionada}
+     onClose={() => setOpSelecionada(null)}
+     />
+   )}
     </div>
   );
 }

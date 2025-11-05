@@ -2,25 +2,46 @@ import React, { useState, useEffect } from 'react';
 
 export default function ModalSeparacao({ op, onClose, onSalvar }) {
   const [tipoSeparacao, setTipoSeparacao] = useState('Total');
-  const [qtdRocas, setQtdRocas] = useState(op.quantidade_rocas);
+  
+  // Calcular quantidade pendente (para status Parcial)
+  const qtdPendente = op.quantidade_rocas - (op.qtd_separada_rocas || 0);
+  const pesoUnitario = op.quantidade_kg / op.quantidade_rocas;
+  
+  const [qtdRocas, setQtdRocas] = useState(
+    op.statusSeparacao === 'Parcial' ? qtdPendente : op.quantidade_rocas
+  );
   const [observacao, setObservacao] = useState('');
 
-  const qtdKg = (qtdRocas * (op.quantidade_kg / op.quantidade_rocas)).toFixed(2);
+  const qtdKg = (qtdRocas * pesoUnitario).toFixed(2);
 
   // Atualizar quantidade quando mudar o tipo de separação
   useEffect(() => {
     if (tipoSeparacao === 'Total') {
-      setQtdRocas(op.quantidade_rocas);
+      // Se já tinha separação parcial, mostrar o total pendente
+      const qtdPendente = op.quantidade_rocas - (op.qtd_separada_rocas || 0);
+      setQtdRocas(qtdPendente);
     } else if (tipoSeparacao === 'Parcial') {
       setQtdRocas(0);
     }
-  }, [tipoSeparacao, op.quantidade_rocas]);
+  }, [tipoSeparacao, op.quantidade_rocas, op.qtd_separada_rocas]);
 
   const handleSalvar = () => {
+    // Se já tinha separação anterior, SOMAR as quantidades
+    const qtdAnteriorRocas = op.qtd_separada_rocas || 0;
+    const qtdAnteriorKg = op.qtd_separada_kg || 0;
+    
+    const qtdTotalRocas = tipoSeparacao === 'NaoSeparou' 
+      ? qtdAnteriorRocas 
+      : qtdAnteriorRocas + parseInt(qtdRocas);
+      
+    const qtdTotalKg = tipoSeparacao === 'NaoSeparou' 
+      ? qtdAnteriorKg 
+      : qtdAnteriorKg + parseFloat(qtdKg);
+    
     onSalvar({
       statusSeparacao: tipoSeparacao,
-      qtd_separada_rocas: tipoSeparacao === 'NaoSeparou' ? 0 : parseInt(qtdRocas),
-      qtd_separada_kg: tipoSeparacao === 'NaoSeparou' ? 0 : parseFloat(qtdKg),
+      qtd_separada_rocas: qtdTotalRocas,
+      qtd_separada_kg: qtdTotalKg,
       observacao: observacao
     });
   };
@@ -59,6 +80,33 @@ export default function ModalSeparacao({ op, onClose, onSalvar }) {
               </div>
             </div>
           </div>
+
+          {/* Situação Atual (para Parcial e NaoSeparou) */}
+          {(op.statusSeparacao === 'Parcial' || op.statusSeparacao === 'NaoSeparou') && (
+            <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+              <h3 className="font-semibold text-orange-900 mb-2">📊 Situação Atual</h3>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-orange-700">Já Separado:</span>
+                  <p className="font-medium text-orange-900">
+                    {op.qtd_separada_rocas || 0} rocas ({op.qtd_separada_kg || 0} kg)
+                  </p>
+                </div>
+                <div>
+                  <span className="text-orange-700">Ainda Falta:</span>
+                  <p className="font-medium text-orange-900">
+                    {op.quantidade_rocas - (op.qtd_separada_rocas || 0)} rocas ({(op.quantidade_kg - (op.qtd_separada_kg || 0)).toFixed(2)} kg)
+                  </p>
+                </div>
+                {op.observacao && (
+                  <div className="col-span-2">
+                    <span className="text-orange-700">Observação anterior:</span>
+                    <p className="font-medium text-orange-900 italic">"{op.observacao}"</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Tipo de Separação */}
           <div>
@@ -100,7 +148,7 @@ export default function ModalSeparacao({ op, onClose, onSalvar }) {
           {(tipoSeparacao === 'Total' || tipoSeparacao === 'Parcial') && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Quantidade Separada (em rocas) {tipoSeparacao === 'Parcial' && <span className="text-red-600">*</span>}
+                Quantidade Separada {op.statusSeparacao === 'Parcial' || op.statusSeparacao === 'NaoSeparou' ? 'AGORA' : ''} (em rocas) {tipoSeparacao === 'Parcial' && <span className="text-red-600">*</span>}
               </label>
               <input
                 type="number"
@@ -111,20 +159,26 @@ export default function ModalSeparacao({ op, onClose, onSalvar }) {
               />
               <p className="mt-2 text-sm text-gray-600">
                 Equivalente a <span className="font-bold">{qtdKg} kg</span>
+                {(op.statusSeparacao === 'Parcial' || op.statusSeparacao === 'NaoSeparou') && qtdRocas > 0 && (
+                  <span className="text-blue-600 ml-2">
+                    • Total acumulado: {(op.qtd_separada_rocas || 0) + parseInt(qtdRocas)} rocas / {((op.qtd_separada_kg || 0) + parseFloat(qtdKg)).toFixed(2)} kg
+                  </span>
+                )}
               </p>
-              {tipoSeparacao === 'Total' && qtdRocas > op.quantidade_rocas && (
+              {tipoSeparacao === 'Total' && qtdRocas > (op.quantidade_rocas - (op.qtd_separada_rocas || 0)) && (
                 <p className="mt-2 text-sm text-green-600 font-medium">
-                  ✅ Separando {qtdRocas - op.quantidade_rocas} rocas a mais ({(qtdKg - op.quantidade_kg).toFixed(2)} kg)
+                  ✅ Separando {qtdRocas - (op.quantidade_rocas - (op.qtd_separada_rocas || 0))} rocas a mais que o necessário
                 </p>
               )}
-              {tipoSeparacao === 'Parcial' && qtdRocas < op.quantidade_rocas && qtdRocas > 0 && (
+              {tipoSeparacao === 'Parcial' && qtdRocas > 0 && (
                 <p className="mt-2 text-sm text-orange-600 font-medium">
-                  ⚠️ Faltam {op.quantidade_rocas - qtdRocas} rocas ({(op.quantidade_kg - qtdKg).toFixed(2)} kg)
+                  ⚠️ Ainda faltarão {op.quantidade_rocas - (op.qtd_separada_rocas || 0) - qtdRocas} rocas 
+                  ({(op.quantidade_kg - (op.qtd_separada_kg || 0) - qtdKg).toFixed(2)} kg) após esta separação
                 </p>
               )}
               {tipoSeparacao === 'Parcial' && qtdRocas == 0 && (
                 <p className="mt-2 text-sm text-red-600 font-medium">
-                  ⚠️ Informe a quantidade que foi separada
+                  ⚠️ Informe a quantidade que foi separada agora
                 </p>
               )}
             </div>
